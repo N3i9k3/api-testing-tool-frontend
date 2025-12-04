@@ -1,4 +1,5 @@
-import ReactJson from "react-json-view";
+import ReactJson from "react18-json-view";
+
 
 export default function ResponseViewer({ response }) {
   if (!response) return <div className="p-4">No response yet</div>;
