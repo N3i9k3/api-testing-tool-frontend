@@ -5,7 +5,6 @@ import "ace-builds/src-noconflict/mode-json";
 import "ace-builds/src-noconflict/theme-github"; // light theme
 import "ace-builds/src-noconflict/theme-monokai"; // dark theme
 import "ace-builds/src-noconflict/worker-json"; // worker fix
-import ResponseViewer from "./ResponseViewer";
 import EnvManager from "./EnvManager";
 
 const API_BASE = "http://localhost:5000";
@@ -41,26 +40,23 @@ export default function Dashboard() {
 
   const [history, setHistory] = useState([]);
 
-  // theme initialised based on document (keeps persisted class if page loaded with dark)
-  
-const [theme, setTheme] = useState("light");
+  // ---------------- THEME ----------------
+  const [theme, setTheme] = useState("light");
 
-useEffect(() => {
-  const savedTheme = localStorage.getItem("theme");
-  if (savedTheme) {
-    setTheme(savedTheme);
-    document.documentElement.classList.toggle("dark", savedTheme === "dark");
-  }
-}, []);
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.classList.toggle("dark", savedTheme === "dark");
+    }
+  }, []);
 
-const toggleTheme = () => {
-  const newTheme = theme === "light" ? "dark" : "light";
-  setTheme(newTheme);
-  document.documentElement.classList.toggle("dark", newTheme === "dark");
-  localStorage.setItem("theme", newTheme);
-};
-
-
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    localStorage.setItem("theme", newTheme);
+  };
 
   // ---------------- HELPERS ----------------
   const addRow = (setter, data) => setter([...data, { key: "", value: "" }]);
@@ -187,68 +183,73 @@ const toggleTheme = () => {
     setUrl(item.url);
     setMethod(item.method);
     setHeaders(
-      Object.entries(item.headers || {}).map(([key, value]) => ({ key, value })) ||
-        [{ key: "", value: "" }]
+      Object.entries(item.headers || {}).map(([key, value]) => ({ key, value })) || [
+        { key: "", value: "" },
+      ]
     );
     setBody(JSON.stringify(item.body || {}, null, 2));
   };
 
   const sendRequest = async () => {
-  setLoading(true);
-  setError(null);
-  setResponse(null);
+    setLoading(true);
+    setError(null);
+    setResponse(null);
 
-  try {
-    let finalUrl = applyEnvVariables(url);
-    finalUrl = appendQueryParams(finalUrl);
-    let finalBody = applyEnvVariables(body);
-    const formattedHeaders = convertPairsToObject(headers);
+    try {
+      let finalUrl = applyEnvVariables(url);
+      finalUrl = appendQueryParams(finalUrl);
+      let finalBody = applyEnvVariables(body);
+      const formattedHeaders = convertPairsToObject(headers);
 
-    if (finalBody && method !== "GET" && method !== "HEAD") {
-      try {
-        finalBody = JSON.parse(finalBody);
-      } catch {
-        throw new Error("Invalid JSON Body");
+      if (finalBody && method !== "GET" && method !== "HEAD") {
+        try {
+          finalBody = JSON.parse(finalBody);
+        } catch {
+          throw new Error("Invalid JSON Body");
+        }
       }
-    }
 
-    // Build fetch options
-    const fetchOptions = {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    };
-
-    if (method !== "GET" && method !== "HEAD") {
-      fetchOptions.body = JSON.stringify({
-        url: finalUrl,
+      const fetchOptions = {
         method,
-        headers: formattedHeaders,
-        body: finalBody || {},
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
+      if (method !== "GET" && method !== "HEAD") {
+        fetchOptions.body = JSON.stringify({
+          url: finalUrl,
+          method,
+          headers: formattedHeaders,
+          body: finalBody || {},
+        });
+      }
+
+      const res = await fetch(`${API_BASE}/proxy`, fetchOptions);
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+      const data = await res.json();
+      setResponse({
+        status: data.status,
+        time: data.time,
+        headers: data.headers,
+        body: data.body,
       });
+
+      setHistory((prev) => [
+        { url: finalUrl, method, time: new Date().toLocaleTimeString() },
+        ...prev,
+      ]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const res = await fetch(`${API_BASE}/proxy`, fetchOptions);
-
-    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-    const data = await res.json();
-    setResponse({ status: data.status, time: data.time, headers: data.headers, body: data.body });
-
-    setHistory((prev) => [
-      { url: finalUrl, method, time: new Date().toLocaleTimeString() },
-      ...prev,
-    ]);
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-      
-
+  // ---------------- RENDER ----------------
+  return (
+    <div className="min-h-screen flex space-x-4 p-4">
       {/* LEFT SIDEBAR */}
       <motion.div
         className="w-1/5 bg-white dark:bg-slate-800 border-r dark:border-slate-700 p-4 flex flex-col rounded-xl shadow-md"
@@ -259,18 +260,19 @@ const toggleTheme = () => {
         {/* History */}
         <div className="mb-4 p-2 bg-gray-50 dark:bg-slate-900 rounded-lg">
           <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">History</h3>
-          {history.length === 0 && (
+          {history.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-sm">No requests yet</p>
+          ) : (
+            history.map((h, idx) => (
+              <div
+                key={idx}
+                className="mb-1 p-1 border rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-900 dark:text-gray-100 text-sm"
+              >
+                {h.method}: {h.url}{" "}
+                <span className="text-xs text-gray-500 dark:text-gray-400">({h.time})</span>
+              </div>
+            ))
           )}
-          {history.map((h, idx) => (
-            <div
-              key={idx}
-              className="mb-1 p-1 border rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-900 dark:text-gray-100 text-sm"
-            >
-              {h.method}: {h.url}{" "}
-              <span className="text-xs text-gray-500 dark:text-gray-400">({h.time})</span>
-            </div>
-          ))}
         </div>
 
         {/* Collections */}
@@ -293,11 +295,9 @@ const toggleTheme = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900 rounded-lg p-2">
-          {Array.isArray(collections) && collections.length === 0 && (
+          {collections.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-sm">No collections yet</p>
-          )}
-
-          {Array.isArray(collections) &&
+          ) : (
             collections.map((c) => (
               <div key={c.id} className="mb-2">
                 <div
@@ -323,7 +323,8 @@ const toggleTheme = () => {
                     </div>
                   ))}
               </div>
-            ))}
+            ))
+          )}
         </div>
       </motion.div>
 
@@ -376,6 +377,7 @@ const toggleTheme = () => {
           </select>
         </div>
 
+        {/* Request URL */}
         <label className="block font-medium mb-1 text-gray-900 dark:text-gray-100">Request URL</label>
         <input
           type="text"
@@ -385,6 +387,7 @@ const toggleTheme = () => {
           onChange={(e) => setUrl(e.target.value)}
         />
 
+        {/* Method & Buttons */}
         <div className="flex items-center space-x-4 mb-6">
           <select
             className="border border-gray-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100"
@@ -448,7 +451,7 @@ const toggleTheme = () => {
         <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Query Params</h3>
         {params.map((p, i) => (
           <div key={i} className="flex space-x-2 mb-2">
-                        <input
+            <input
               className="border border-gray-300 dark:border-slate-700 p-2 w-1/2 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100"
               placeholder="Key"
               value={p.key}
@@ -466,72 +469,65 @@ const toggleTheme = () => {
           + Add Param
         </button>
 
-        {/* JSON BODY */}
-        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">JSON Body</h3>
-        <div className="rounded-lg overflow-hidden border border-gray-300 dark:border-slate-700 mb-6">
-          <AceEditor
-            key={theme}  // 🔹 important!
-            mode="json"
-            theme={theme === "dark" ? "monokai" : "github"}
-            name="bodyEditor"
-            value={body}
-            onChange={(value) => setBody(value)}
-            width="100%"
-            height="220px"
-            fontSize={14}
-            showPrintMargin={false}
-            showGutter={true}
-            highlightActiveLine={true}
-            setOptions={{ showLineNumbers: true, tabSize: 2, useWorker: true }}
-          />
+        {/* BODY */}
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Request Body</h3>
+        <AceEditor
+          mode="json"
+          theme={theme === "light" ? "github" : "monokai"}
+          name="requestBodyEditor"
+          onChange={(val) => setBody(val)}
+          value={body}
+          width="100%"
+          height="200px"
+          fontSize={14}
+          setOptions={{ useWorker: true, tabSize: 2 }}
+          className="mb-6"
+        />
 
-
-        </div>
-      </div>
-
-      {/* RIGHT RESPONSE PANEL */}
-      <motion.div
-        className="w-1/5 bg-white dark:bg-slate-800 border-l dark:border-slate-700 p-4 overflow-y-auto rounded-xl shadow-md"
-        initial={{ x: 50, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Response</h2>
-
+        {/* RESPONSE */}
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Response</h3>
         {loading && (
           <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 mb-2">
             <span className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin inline-block" />
             <span>Waiting for response…</span>
           </div>
         )}
-
         {error && <div className="text-red-600 dark:text-red-400 mb-2">{error}</div>}
-
         {response ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
-            <div className="bg-gray-50 dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700 mb-3">
-              <p className="text-sm text-gray-900 dark:text-gray-100 mb-1">
-                <strong>Status:</strong> {response.status}
-              </p>
-              <p className="text-sm text-gray-900 dark:text-gray-100 mb-2">
-                <strong>Time:</strong> {response.time} ms
-              </p>
+          <div className="bg-gray-50 dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700 mb-3">
+            <p className="text-sm text-gray-900 dark:text-gray-100 mb-1">
+              <strong>Status:</strong> {response.status}
+            </p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 mb-2">
+              <strong>Time:</strong> {response.time} ms
+            </p>
 
-              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Headers</h4>
-              <pre className="text-xs bg-white dark:bg-slate-800 p-2 rounded-md border border-gray-200 dark:border-slate-700 overflow-auto mb-2">
-                {JSON.stringify(response.headers, null, 2)}
-              </pre>
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Headers</h4>
+            <pre className="text-xs bg-white dark:bg-slate-800 p-2 rounded-md border border-gray-200 dark:border-slate-700 overflow-auto mb-2">
+              {JSON.stringify(response.headers, null, 2)}
+            </pre>
 
-              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Body</h4>
-              <pre className="text-xs bg-white dark:bg-slate-800 p-2 rounded-md border border-gray-200 dark:border-slate-700 overflow-auto">
-                {typeof response.body === "string" ? response.body : JSON.stringify(response.body, null, 2)}
-              </pre>
-            </div>
-          </motion.div>
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Body</h4>
+            <pre className="text-xs bg-white dark:bg-slate-800 p-2 rounded-md border border-gray-200 dark:border-slate-700 overflow-auto">
+              {typeof response.body === "string" ? response.body : JSON.stringify(response.body, null, 2)}
+            </pre>
+          </div>
         ) : (
           !loading && <p className="text-gray-500 dark:text-gray-400">Send a request to see response</p>
         )}
+      </div>
+
+      {/* RIGHT SIDEBAR */}
+      <motion.div
+        className="w-1/5 bg-white dark:bg-slate-800 border-l dark:border-slate-700 p-4 rounded-xl shadow-md"
+        initial={{ x: 50, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">Info Panel</h3>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">You can add additional info here</p>
       </motion.div>
     </div>
   );
 }
+
