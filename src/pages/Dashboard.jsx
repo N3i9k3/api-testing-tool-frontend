@@ -193,56 +193,60 @@ const toggleTheme = () => {
     setBody(JSON.stringify(item.body || {}, null, 2));
   };
 
-  // ---------------- SEND REQUEST ----------------
   const sendRequest = async () => {
-    setLoading(true);
-    setError(null);
-    setResponse(null);
+  setLoading(true);
+  setError(null);
+  setResponse(null);
 
-    try {
-      let finalUrl = applyEnvVariables(url);
-      finalUrl = appendQueryParams(finalUrl);
-      let finalBody = applyEnvVariables(body);
-      const formattedHeaders = convertPairsToObject(headers);
+  try {
+    let finalUrl = applyEnvVariables(url);
+    finalUrl = appendQueryParams(finalUrl);
+    let finalBody = applyEnvVariables(body);
+    const formattedHeaders = convertPairsToObject(headers);
 
-      if (finalBody && method !== "GET") {
-        try {
-          finalBody = JSON.parse(finalBody);
-        } catch {
-          throw new Error("Invalid JSON Body");
-        }
+    if (finalBody && method !== "GET" && method !== "HEAD") {
+      try {
+        finalBody = JSON.parse(finalBody);
+      } catch {
+        throw new Error("Invalid JSON Body");
       }
-
-      const res = await fetch(`${API_BASE}/proxy`, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ url: finalUrl, method, headers: formattedHeaders, body: finalBody || {} }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-      const data = await res.json();
-      setResponse({ status: data.status, time: data.time, headers: data.headers, body: data.body });
-
-      setHistory((prev) => [
-        { url: finalUrl, method, time: new Date().toLocaleTimeString() },
-        ...prev,
-      ]);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
     }
-  };
 
-  if (!token) return <p className="p-4">Redirecting to login...</p>;
+    // Build fetch options
+    const fetchOptions = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    };
 
-  return (
-    <div
-      className={`min-h-screen flex bg-gray-100 dark:bg-slate-900 text-gray-900 dark:text-gray-100 transition-colors`}
-    >
+    if (method !== "GET" && method !== "HEAD") {
+      fetchOptions.body = JSON.stringify({
+        url: finalUrl,
+        method,
+        headers: formattedHeaders,
+        body: finalBody || {},
+      });
+    }
+
+    const res = await fetch(`${API_BASE}/proxy`, fetchOptions);
+
+    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+    const data = await res.json();
+    setResponse({ status: data.status, time: data.time, headers: data.headers, body: data.body });
+
+    setHistory((prev) => [
+      { url: finalUrl, method, time: new Date().toLocaleTimeString() },
+      ...prev,
+    ]);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
       
 
       {/* LEFT SIDEBAR */}
