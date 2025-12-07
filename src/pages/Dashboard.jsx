@@ -10,7 +10,8 @@ import "ace-builds/src-noconflict/theme-monokai"; // dark theme
 
 import EnvManager from "./EnvManager";
 
-const API_BASE = import.meta.env.api-testing-tool-backend-production.up.railway.app || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+
 
 export default function Dashboard() {
   const token = localStorage.getItem("token");
