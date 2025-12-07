@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import AceEditor from "react-ace";
+
+// Ace Editor imports
 import "ace-builds/src-noconflict/mode-json";
 import "ace-builds/src-noconflict/theme-github"; // light theme
 import "ace-builds/src-noconflict/theme-monokai"; // dark theme
-import "ace-builds/src-noconflict/worker-json"; // worker fix
+
+
 import EnvManager from "./EnvManager";
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.api-testing-tool-backend-production.up.railway.app || "http://localhost:5000";
 
 export default function Dashboard() {
   const token = localStorage.getItem("token");
@@ -180,15 +183,16 @@ export default function Dashboard() {
   };
 
   const loadItemToForm = (item) => {
-    setUrl(item.url);
-    setMethod(item.method);
-    setHeaders(
-      Object.entries(item.headers || {}).map(([key, value]) => ({ key, value })) || [
-        { key: "", value: "" },
-      ]
-    );
-    setBody(JSON.stringify(item.body || {}, null, 2));
-  };
+  setUrl(item.url || "");
+  setMethod(item.method || "GET");
+  setHeaders(
+    item.headers && Object.keys(item.headers).length > 0
+      ? Object.entries(item.headers).map(([key, value]) => ({ key, value }))
+      : [{ key: "", value: "" }]
+  );
+  setBody(item.body ? JSON.stringify(item.body, null, 2) : "");
+};
+
 
   const sendRequest = async () => {
     setLoading(true);
@@ -480,7 +484,7 @@ export default function Dashboard() {
           width="100%"
           height="200px"
           fontSize={14}
-          setOptions={{ useWorker: true, tabSize: 2 }}
+          setOptions={{ useWorker: false, tabSize: 2 }}
           className="mb-6"
         />
 
@@ -504,12 +508,12 @@ export default function Dashboard() {
 
             <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Headers</h4>
             <pre className="text-xs bg-white dark:bg-slate-800 p-2 rounded-md border border-gray-200 dark:border-slate-700 overflow-auto mb-2">
-              {JSON.stringify(response.headers, null, 2)}
+              {JSON.stringify(response.headers)}
             </pre>
 
             <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Body</h4>
             <pre className="text-xs bg-white dark:bg-slate-800 p-2 rounded-md border border-gray-200 dark:border-slate-700 overflow-auto">
-              {typeof response.body === "string" ? response.body : JSON.stringify(response.body, null, 2)}
+              {typeof response.body === "string" ? response.body : JSON.stringify(response.body)}
             </pre>
           </div>
         ) : (
